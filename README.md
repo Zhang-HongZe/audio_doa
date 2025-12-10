@@ -6,11 +6,9 @@
 
 - [功能特性](#功能特性)
 - [快速开始](#快速开始)
-- [组件架构](#组件架构)
 - [API 参考](#api-参考)
 - [算法原理](#算法原理)
 - [配置参数](#配置参数)
-- [使用示例](#使用示例)
 - [注意事项](#注意事项)
 - [依赖项](#依赖项)
 - [许可证](#许可证)
@@ -56,9 +54,9 @@ void app_main(void) {
     audio_doa_app_handle_t doa_app;
     audio_doa_app_config_t config = {
         .audio_doa_result_callback = doa_result_callback,
-        .audio_doa_result_callback_ctx = NULL,
+        .audio_doa_result_callback_ctx = NULL,  // 可以传递自定义上下文
         .audio_doa_monitor_callback = doa_monitor_callback,
-        .audio_doa_monitor_callback_ctx = NULL,
+        .audio_doa_monitor_callback_ctx = NULL,  // 可以传递自定义上下文
     };
     
     // 创建 DOA 应用实例
@@ -72,55 +70,7 @@ void app_main(void) {
 }
 ```
 
-## 组件架构
-
-该组件采用三层架构设计：
-
-```
-┌─────────────────────────────────────┐
-│      audio_doa_app (应用层)          │
-│  - 统一 API 接口                     │
-│  - VAD 控制                          │
-│  - 回调管理                          │
-└──────────────┬──────────────────────┘
-               │
-       ┌───────┴────────┐
-       │                │
-┌──────▼──────┐  ┌─────▼──────────────┐
-│ audio_doa   │  │ audio_doa_tracker   │
-│ (核心模块)  │  │ (角度跟踪器)        │
-│             │  │                     │
-│ - DOA 计算  │  │ - 角度平滑          │
-│ - 高斯滤波  │  │ - 智能 90° 处理     │
-│ - 角度校准  │  │ - 角度量化          │
-└─────────────┘  └─────────────────────┘
-```
-
-### 模块说明
-
-#### 1. audio_doa（核心模块）
-
-负责基础的 DOA 角度计算：
-- 接收双通道交错音频数据
-- 执行 DOA 角度计算（基于 `esp-sr` 库）
-- 应用高斯加权移动平均滤波
-- 执行角度校准算法
-
-#### 2. audio_doa_tracker（角度跟踪器）
-
-对原始 DOA 角度进行进一步处理，提供更稳定的输出：
-- 鲁棒均值计算（去除异常值）
-- 智能 90 度（正面）角度处理
-- 角度量化（减少小幅抖动）
-- 变化检测和过滤
-
-#### 3. audio_doa_app（应用层封装）
-
-提供简化的高级 API：
-- 整合 DOA 和 Tracker 模块
-- 统一的生命周期管理
-- VAD 集成支持
-- 双回调机制（监控 + 结果）
+**注意**：回调上下文（`*_callback_ctx`）会原样传递给对应的回调函数，可以用于传递应用特定的数据或状态。
 
 ## API 参考
 
@@ -151,9 +101,13 @@ esp_err_t audio_doa_app_set_vad_detect(audio_doa_app_handle_t app, bool vad_dete
 
 ```c
 // 最终结果回调（经过 Tracker 处理）
+// @param avg_angle  平均角度值（0-180度）
+// @param ctx        用户自定义上下文指针（从配置中传入）
 typedef void (*audio_doa_result_callback_t)(float avg_angle, void *ctx);
 
 // 监控回调（原始 DOA 角度）
+// @param angle  原始角度值（0-180度）
+// @param ctx    用户自定义上下文指针（从配置中传入）
 typedef void (*audio_doa_monitor_callback_t)(float angle, void *ctx);
 ```
 
@@ -161,12 +115,18 @@ typedef void (*audio_doa_monitor_callback_t)(float angle, void *ctx);
 
 ```c
 typedef struct {
-    audio_doa_monitor_callback_t  audio_doa_monitor_callback;      // 监控回调（可选）
-    void*                         audio_doa_monitor_callback_ctx;  // 监控回调上下文
-    audio_doa_result_callback_t   audio_doa_result_callback;       // 结果回调（必需）
-    void*                         audio_doa_result_callback_ctx;   // 结果回调上下文
+    audio_doa_monitor_callback_t  audio_doa_monitor_callback;      // 监控回调（可选，可为 NULL）
+    void*                         audio_doa_monitor_callback_ctx;  // 监控回调上下文（可为 NULL）
+    audio_doa_result_callback_t   audio_doa_result_callback;       // 结果回调（必需，不可为 NULL）
+    void*                         audio_doa_result_callback_ctx;    // 结果回调上下文（可为 NULL）
 } audio_doa_app_config_t;
 ```
+
+**回调上下文说明**：
+- `audio_doa_monitor_callback_ctx` 和 `audio_doa_result_callback_ctx` 会原样传递给对应的回调函数
+- 可以传递 `NULL` 或不传递任何上下文
+- 也可以传递指向应用特定数据结构的指针，用于在回调中访问应用状态
+- 上下文指针的生命周期必须覆盖整个 DOA 应用实例的使用期间
 
 ## 算法原理
 
@@ -237,7 +197,6 @@ Tracker 模块实现以下处理步骤：
 - **采样率**：16000 Hz
 - **通道**：双通道交错
 - **字节序**：小端序
-- **数据排列**：`CH1_LSB, CH1_MSB, CH2_LSB, CH2_MSB, CH1_LSB, CH1_MSB, ...`
 
 转换为 `int16_t` 后：
 ```
@@ -246,73 +205,6 @@ audio_buffer[1] = CH2 (右)
 audio_buffer[2] = CH1 (左)
 audio_buffer[3] = CH2 (右)
 ...
-```
-
-## 使用示例
-
-### 完整示例
-
-```c
-#include "audio_doa_app.h"
-#include "esp_log.h"
-
-static const char *TAG = "DOA_EXAMPLE";
-
-static void doa_result_callback(float avg_angle, void *ctx) {
-    ESP_LOGI(TAG, "Final DOA angle: %.2f degrees", avg_angle);
-    
-    // 根据角度执行相应操作
-    if (avg_angle < 60) {
-        ESP_LOGI(TAG, "Sound source is on the LEFT");
-    } else if (avg_angle > 120) {
-        ESP_LOGI(TAG, "Sound source is on the RIGHT");
-    } else {
-        ESP_LOGI(TAG, "Sound source is in FRONT");
-    }
-}
-
-static void doa_monitor_callback(float angle, void *ctx) {
-    // 可选：实时监控原始角度
-    ESP_LOGD(TAG, "Raw DOA angle: %.2f degrees", angle);
-}
-
-void audio_data_callback(uint8_t *data, int size) {
-    // 假设这是从音频采集回调中调用
-    static audio_doa_app_handle_t doa_app = NULL;
-    
-    if (doa_app == NULL) {
-        // 初始化（仅执行一次）
-        audio_doa_app_config_t config = {
-            .audio_doa_result_callback = doa_result_callback,
-            .audio_doa_result_callback_ctx = NULL,
-            .audio_doa_monitor_callback = doa_monitor_callback,
-            .audio_doa_monitor_callback_ctx = NULL,
-        };
-        
-        ESP_ERROR_CHECK(audio_doa_app_create(&doa_app, &config));
-        ESP_ERROR_CHECK(audio_doa_app_set_vad_detect(doa_app, true));
-    }
-    
-    // 写入音频数据
-    audio_doa_app_data_write(doa_app, data, size);
-}
-```
-
-### 与 VAD 集成
-
-```c
-void vad_detect_callback(bool vad_detected, void *ctx) {
-    audio_doa_app_handle_t doa_app = (audio_doa_app_handle_t)ctx;
-    
-    // 仅在检测到语音时启用 DOA 处理
-    audio_doa_app_set_vad_detect(doa_app, vad_detected);
-    
-    if (vad_detected) {
-        ESP_LOGI("VAD", "Voice detected, starting DOA processing");
-    } else {
-        ESP_LOGI("VAD", "Voice ended, stopping DOA processing");
-    }
-}
 ```
 
 ## 注意事项
