@@ -24,17 +24,7 @@ typedef struct {
     void*                                       audio_doa_result_callback_ctx;
 } audio_doa_app_config_t;
 
-typedef struct {
-    audio_doa_handle_t                          doa_handle;
-    audio_doa_tracker_handle_t                  doa_tracker_handle;
-    audio_doa_monitor_callback_t                audio_doa_monitor_callback;
-    void*                                       audio_doa_monitor_callback_ctx;
-    struct {
-        bool vad_detect : 1;
-    }flags;
-} audio_doa_app_t;
-
-typedef audio_doa_app_t *audio_doa_app_handle_t;
+typedef void *audio_doa_app_handle_t;
 
 /**
  * @brief  Create a new audio DOA app instance
