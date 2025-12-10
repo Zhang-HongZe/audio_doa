@@ -35,7 +35,7 @@ static void audio_doa_callback(float angle, void *ctx)
     }
     audio_doa_tracker_feed(app->doa_tracker_handle, angle);
 
-    ESP_LOGI(TAG, "audio_doa_callback: angle %.2f", angle);
+    // ESP_LOGI(TAG, "audio_doa_callback: angle %.2f", angle);
 
     if (app->audio_doa_monitor_callback != NULL) {
         app->audio_doa_monitor_callback(angle, app->audio_doa_monitor_callback_ctx);
