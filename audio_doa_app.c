@@ -62,12 +62,12 @@ esp_err_t audio_doa_app_create(audio_doa_app_handle_t *handle, audio_doa_app_con
         return ret;
     }
     app->audio_doa_monitor_callback = config->audio_doa_monitor_callback;
-    app->audio_doa_monitor_callback_ctx = (void *)app;
+    app->audio_doa_monitor_callback_ctx = config->audio_doa_monitor_callback_ctx;
     audio_doa_set_doa_result_callback(app->doa_handle, audio_doa_callback, (void *)app);
 
     audio_doa_tracker_cfg_t doa_tracker_cfg = {
         .result_callback = config->audio_doa_result_callback,
-        .ctx = app,
+        .ctx = config->audio_doa_result_callback_ctx,
         .output_interval_ms = 1000,
     };
     ret = audio_doa_tracker_init(&doa_tracker_cfg, &app->doa_tracker_handle);
