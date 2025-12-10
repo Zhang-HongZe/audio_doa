@@ -4,5 +4,5 @@ dependencies:
 name: audio_doa
 version: 1.0.0
 description: Audio DOA is a library for ESP32 that provides audio direction of arrival functionality.
-url: "https://github.com/Zhang-HongZe/beat_detection"
+url: "https://github.com/Zhang-HongZe/audio_doa"
 license: Apache-2.0
