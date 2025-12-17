@@ -115,6 +115,7 @@ typedef void (*audio_doa_monitor_callback_t)(float angle, void *ctx);
 
 ```c
 typedef struct {
+    float                         distance;                        // 麦克风间距（默认0.046）
     audio_doa_monitor_callback_t  audio_doa_monitor_callback;      // 监控回调（可选，可为 NULL）
     void*                         audio_doa_monitor_callback_ctx;  // 监控回调上下文（可为 NULL）
     audio_doa_result_callback_t   audio_doa_result_callback;       // 结果回调（必需，不可为 NULL）
