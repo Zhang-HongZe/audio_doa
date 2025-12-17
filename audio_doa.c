@@ -120,13 +120,10 @@ static inline void extract_mic_data(audio_doa_t *doa)
 {
     int16_t *audio_buffer = (int16_t *)doa->audio_data;
     int size = doa->audio_data_size / sizeof(int16_t);
-    // 音频格式：两个字节通道1，两个字节通道2交错
-    // 即：CH1_LSB, CH1_MSB, CH2_LSB, CH2_MSB, CH1_LSB, CH1_MSB, ...
-    // 转换为int16_t后：audio_buffer[0]=CH1, audio_buffer[1]=CH2, audio_buffer[2]=CH1, ...
     int sample_count = size / 2;  // 每个通道的样本数
     for (int i = 0; i < sample_count; i++) {
-        doa->mic_data[MIC_DIRECTION_LEFT][i] = audio_buffer[i * 2];      // 通道1
-        doa->mic_data[MIC_DIRECTION_RIGHT][i] = audio_buffer[i * 2 + 1]; // 通道2
+        doa->mic_data[MIC_DIRECTION_LEFT][i] = audio_buffer[i * 2];
+        doa->mic_data[MIC_DIRECTION_RIGHT][i] = audio_buffer[i * 2 + 1];
     }
 }
 
@@ -142,7 +139,6 @@ static void audio_doa_thread(void *arg)
         }
         doa->state = AUDIO_DOA_STATE_RUNNING;
         
-        // 从 StreamBuffer 读取音频数据
         size_t bytes_received = xStreamBufferReceive(doa->stream_buffer, 
                                                      doa->audio_data, 
                                                      AUDIO_DOA_DATA_BUS_SIZE, 
@@ -209,7 +205,6 @@ esp_err_t audio_doa_new(audio_doa_handle_t *doa_handle, audio_doa_config_t *conf
         free(doa);
         return ESP_ERR_NO_MEM;
     }
-    // 创建 FreeRTOS StreamBuffer，大小为 AUDIO_DOA_DATA_BUS_SIZE * 3
     doa->stream_buffer = xStreamBufferCreate(AUDIO_DOA_DATA_BUS_SIZE * 3, AUDIO_DOA_DATA_BUS_SIZE);
     if (doa->stream_buffer == NULL) {
         vEventGroupDelete(doa->event_group);
@@ -217,9 +212,8 @@ esp_err_t audio_doa_new(audio_doa_handle_t *doa_handle, audio_doa_config_t *conf
         ESP_LOGE(TAG, "Failed to create stream buffer");
         return ESP_ERR_NO_MEM;
     }
-    // 计算每个通道的样本数：AUDIO_DOA_DATA_BUS_SIZE 字节 / (2通道 * 2字节/样本)
     int samples = AUDIO_DOA_DATA_BUS_SIZE / (sizeof(int16_t) * 2);
-    doa->doa_handle = esp_doa_create(16000, 10, 0.06, samples);
+    doa->doa_handle = esp_doa_create(16000, 10, config->distance > 0.0f ? config->distance : 0.046, samples);
     if (doa->doa_handle == NULL) {
         vStreamBufferDelete(doa->stream_buffer);
         vEventGroupDelete(doa->event_group);
@@ -247,7 +241,6 @@ esp_err_t audio_doa_new(audio_doa_handle_t *doa_handle, audio_doa_config_t *conf
     }
     generate_gaussian_weights(doa->gaussian_weights, DOA_WINDOW_SIZE, GAUSSIAN_SIGMA);
 
-    // 为每个通道分配缓冲区，大小为 AUDIO_DOA_DATA_BUS_SIZE / 2 (每个通道的字节数)
     for (int i = 0; i < MIC_DIRECTION_MAX; i++) {
         doa->mic_data[i] = (int16_t *)calloc(AUDIO_DOA_DATA_BUS_SIZE / (sizeof(int16_t) * 2), sizeof(int16_t));
         if (doa->mic_data[i] == NULL) {
@@ -264,7 +257,6 @@ esp_err_t audio_doa_new(audio_doa_handle_t *doa_handle, audio_doa_config_t *conf
         }
     }
 
-    // 使用 FreeRTOS xTaskCreate 创建任务
     BaseType_t ret = xTaskCreate(audio_doa_thread, "audio_doa_thread", 4096, doa, 10, &doa->task_handle);
     if (ret != pdPASS) {
         for (int i = 0; i < MIC_DIRECTION_MAX; i++) {
@@ -295,7 +287,6 @@ esp_err_t audio_doa_delete(audio_doa_handle_t doa_handle)
 
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    // 删除任务
     if (doa->task_handle != NULL) {
         vTaskDelete(doa->task_handle);
     }
@@ -372,7 +363,6 @@ esp_err_t audio_doa_data_write(audio_doa_handle_t doa_handle, uint8_t *data, int
         return ESP_FAIL;
     }
     
-    // 使用 FreeRTOS StreamBuffer 发送数据
     size_t bytes_sent = xStreamBufferSend(doa->stream_buffer, data, data_size, pdMS_TO_TICKS(10));
     if (bytes_sent != data_size) {
         return ESP_FAIL;

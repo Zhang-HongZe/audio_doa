@@ -31,7 +31,7 @@ typedef void (*audio_doa_callback_t)(float angle, void *ctx);
  *         Currently empty, reserved for future configuration options.
  */
 typedef struct {
-
+    float distance;
 } audio_doa_config_t;
 
 /**

@@ -1,3 +1,4 @@
+#include <iterator>
 #include <stdio.h>
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -57,7 +58,10 @@ esp_err_t audio_doa_app_create(audio_doa_app_handle_t *handle, audio_doa_app_con
     app->doa_tracker_handle = NULL;
 
     esp_err_t ret = ESP_OK;
-    ret = audio_doa_new(&app->doa_handle, NULL);
+    audio_doa_config_t doa_cfg = {
+        .distance = config->distance,
+    };
+    ret = audio_doa_new(&app->doa_handle, &doa_cfg);
     if (ret != ESP_OK) {
         return ret;
     }

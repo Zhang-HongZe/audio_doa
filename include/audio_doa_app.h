@@ -18,6 +18,7 @@ typedef void (*audio_doa_result_callback_t)(float avg_angle, void *ctx);
 typedef void (*audio_doa_monitor_callback_t)(float angle, void *ctx);
 
 typedef struct {
+    float                                       distance;
     audio_doa_monitor_callback_t                audio_doa_monitor_callback;
     void*                                       audio_doa_monitor_callback_ctx;
     audio_doa_result_callback_t                 audio_doa_result_callback;
